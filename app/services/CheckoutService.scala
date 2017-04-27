@@ -1,8 +1,9 @@
 package services
 
+import models._
 import javax.inject.Inject
 
-import repositories.ProductRepository
+import repositories.{OfferRepository, ProductRepository}
 
 trait CheckoutService {
   def parseCartData(data:String):Seq[String]
@@ -13,7 +14,16 @@ trait CheckoutService {
 }
 
 
-class ExampleCheckoutService @Inject() (products:ProductRepository) extends CheckoutService{
+class ExampleCheckoutService @Inject() (products:ProductRepository, offers: OfferRepository) extends CheckoutService {
+  private def getOfferDiscount(product:Product, amount:Integer): BigDecimal = {
+    offers.getByProduct(product.name) match {
+      case Some(offer) => {
+        ( amount / (offer.buyAmount + offer.freeAmount)) * offer.freeAmount * product.price
+      }
+      case _ => 0
+    }
+  }
+
   override def parseCartData(data: String): Seq[String] = {
     data.toLowerCase.split(",")
   }
@@ -31,7 +41,7 @@ class ExampleCheckoutService @Inject() (products:ProductRepository) extends Chec
     if(!invalidProducts.isEmpty) {
       Left(s"Invalid products: ${invalidProducts.map(_._1).sorted.mkString(",")}")
     } else {
-      Right(productItems.map(productItem => productItem._2.get.price * productItem._3).sum)
+      Right(productItems.map(productItem => productItem._2.get.price * productItem._3 - getOfferDiscount(productItem._2.get, productItem._3)).sum)
     }
   }
 }
